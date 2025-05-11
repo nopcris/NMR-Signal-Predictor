@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NMR Signal Predictor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --font-family: 'Roboto', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            
+            /* Core Palette - Dark Theme Inspired by Simplicity */
+            --bg-color: #1e272e; /* Deep, dark blue-gray (page background) */
+            --surface-color: #2c3e50; /* Slightly lighter, for main container card */
+            --card-inset-bg-color: #273440; /* For cards within the surface, like input/results areas */
+            --primary-color: #3498db; /* Bright Blue - keep for primary actions */
+            --secondary-color: #2ecc71; /* Bright Green - for success, highlights */
+            --accent-color: #f39c12; /* Orange - for warnings, notes */
+
+            /* Text Colors */
+            --text-primary-color: #e9ecef; /* Off-white for primary text */
+            --text-secondary-color: #adb5bd; /* Lighter gray for subtitles, less important text */
+            --text-on-primary-color: #ffffff; /* Text on primary-color backgrounds */
+
+            /* Borders & UI Elements */
+            --border-color: #4a5568; /* Muted border color */
+            --input-bg-color: #3b4a5a; /* Slightly lighter than card-inset for inputs */
+            --input-focus-border-color: var(--primary-color);
+            --disabled-bg-color: #4a5568;
+            --disabled-text-color: #8a97a8;
+
+            /* Specific States */
+            --error-color: #e74c3c; 
+            --success-color: var(--secondary-color);
+            --warning-color: var(--accent-color);
+
+            /* Spacing & Sizing */
+            --spacing-unit: 8px;
+            --border-radius-sm: 4px;
+            --border-radius-md: 8px;
+            --border-radius-lg: 12px;
+            --box-shadow-soft: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --box-shadow-strong: 0 10px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--text-primary-color);
+            margin: 0;
+            padding: calc(var(--spacing-unit) * 3);
+            line-height: 1.6;
+            font-weight: 300;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: calc(var(--spacing-unit) * 3);
+            background-color: var(--surface-color);
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow-strong);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: calc(var(--spacing-unit) * 4);
+            padding-bottom: calc(var(--spacing-unit) * 2);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        header h1 {
+            color: var(--primary-color);
+            margin: 0 0 calc(var(--spacing-unit) / 2) 0;
+            font-size: 2.2em;
+            font-weight: 500;
+        }
+        header p {
+            color: var(--text-secondary-color);
+            font-size: 1.1em;
+            margin: 0;
+        }
+
+        .input-section-wrapper { /* New wrapper for better shadow and spacing */
+            background-color: var(--card-inset-bg-color);
+            padding: calc(var(--spacing-unit) * 2.5);
+            border-radius: var(--border-radius-md);
+            margin-bottom: calc(var(--spacing-unit) * 1.5); /* Reduced from example text */
+            box-shadow: var(--box-shadow-soft);
+        }
+
+        .input-section {
+            display: flex;
+            gap: calc(var(--spacing-unit) * 2);
+            align-items: center;
+        }
+
+        #smiles-input {
+            flex-grow: 1;
+            padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius-sm);
+            font-size: 1em;
+            background-color: var(--input-bg-color);
+            color: var(--text-primary-color);
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+
+        #smiles-input::placeholder {
+            color: var(--text-secondary-color);
+            opacity: 0.7;
+        }
+        #smiles-input:focus {
+            outline: none;
+            border-color: var(--input-focus-border-color);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.25); /* Primary color with alpha */
+        }
+
+        #process-button {
+            padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 3);
+            background-color: var(--primary-color);
+            color: var(--text-on-primary-color);
+            border: none;
+            border-radius: var(--border-radius-sm);
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            box-shadow: var(--box-shadow-soft);
+        }
+
+        #process-button:hover:not(:disabled) {
+            background-color: #2980b9; /* Darker blue */
+            transform: translateY(-1px);
+        }
+        #process-button:disabled {
+            background-color: var(--disabled-bg-color);
+            color: var(--disabled-text-color);
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        #status-messages {
+            margin-top: calc(var(--spacing-unit) * 2); /* Moved below input wrapper */
+            margin-bottom: calc(var(--spacing-unit) * 2);
+            padding: calc(var(--spacing-unit) * 1.5);
+            border-radius: var(--border-radius-sm);
+            text-align: center;
+            font-weight: 500;
+        }
+        #ketcher-status {} /* Base class for text color below */
+        .status-loading { color: var(--warning-color); background-color: rgba(243, 156, 18, 0.1); border: 1px solid var(--warning-color); }
+        .status-error { color: var(--error-color); background-color: rgba(231, 76, 60, 0.1); border: 1px solid var(--error-color); }
+        .status-success { color: var(--success-color); background-color: rgba(46, 204, 113, 0.1); border: 1px solid var(--success-color); }
+
+
+        #molecular-formula-display {
+            font-weight: 500;
+            color: var(--secondary-color);
+            min-height: 20px;
+            text-align: center;
+            margin-bottom: calc(var(--spacing-unit) * 2.5);
+            font-size: 1.1em;
+        }
+
+        .main-content {
+            display: flex;
+            gap: calc(var(--spacing-unit) * 3);
+            flex-wrap: wrap;
+        }
+
+        .structure-viewer, .results-section { /* Common styling for these main blocks */
+            background-color: var(--card-inset-bg-color);
+            padding: calc(var(--spacing-unit) * 2.5);
+            border-radius: var(--border-radius-md);
+            box-shadow: var(--box-shadow-soft);
+        }
+
+        .structure-viewer {
+            flex: 1;
+            min-width: 300px;
+            min-height: 400px;
+            height: 470px; /* Increased slightly for padding */
+            overflow: hidden; /* Keep iframe corners rounded */
+        }
+
+        #ketcher-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: var(--border-radius-sm); /* If a border is ever added */
+        }
+
+        .results-section {
+            flex: 1.5;
+            min-width: 300px;
+        }
+
+        .nmr-table-container { /* This is now just a logical grouping, not a visual card */
+            margin-bottom: calc(var(--spacing-unit) * 3);
+        }
+        
+        .nmr-table-container h3 {
+            color: var(--secondary-color);
+            margin-top: 0;
+            margin-bottom: calc(var(--spacing-unit) * 1.5);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: var(--spacing-unit);
+            font-weight: 500;
+            font-size: 1.4em;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: calc(var(--spacing-unit) * 2);
+        }
+
+        th, td {
+            text-align: left;
+            padding: calc(var(--spacing-unit) * 1.25) calc(var(--spacing-unit) * 1.5);
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 300;
+        }
+        td { color: var(--text-primary-color); }
+
+        th {
+            background-color: var(--primary-color); /* Use primary color for headers */
+            color: var(--text-on-primary-color);
+            font-weight: 500;
+            font-size: 0.95em;
+        }
+        /* Remove alternating row color for minimalism, or make it more subtle */
+        /* tr:nth-child(even) { background-color: rgba(255,255,255,0.03); } */
+        tr:hover {
+            background-color: rgba(255,255,255,0.05);
+        }
+
+        .nmr-chart {
+            width: 100%;
+            max-width: 600px;
+            height: 250px;
+            display: block;
+            margin: var(--spacing-unit) auto 0;
+            background-color: var(--input-bg-color); /* Use input bg for chart */
+            border-radius: var(--border-radius-sm);
+            border: 1px solid var(--border-color);
+        }
+
+
+        .error-message { /* Use the status message styling */
+            color: var(--error-color);
+            background-color: rgba(231, 76, 60, 0.1);
+            border: 1px solid var(--error-color);
+            font-weight: 500;
+            padding: calc(var(--spacing-unit) * 1.5);
+            border-radius: var(--border-radius-sm);
+            margin-bottom: calc(var(--spacing-unit) * 2.5);
+            text-align: center;
+        }
+
+        .example-smiles {
+            font-size: 0.9em;
+            color: var(--text-secondary-color);
+            margin-top: var(--spacing-unit); 
+            margin-bottom: calc(var(--spacing-unit) * 2.5);
+            text-align: center;
+        }
+        .example-smiles span {
+            cursor: pointer;
+            text-decoration: none; /* Remove underline for cleaner look */
+            border-bottom: 1px dotted var(--text-secondary-color);
+            margin: 0 calc(var(--spacing-unit) / 2);
+            padding-bottom: 2px;
+            transition: color 0.2s ease, border-color 0.2s ease;
+        }
+        .example-smiles span:hover {
+            color: var(--secondary-color);
+            border-color: var(--secondary-color);
+        }
+
+        .ketcher-setup-note {
+            background-color: rgba(243, 156, 18, 0.1); /* Accent color with alpha */
+            border: 1px solid var(--accent-color);
+            color: var(--accent-color);
+            padding: calc(var(--spacing-unit) * 1.5);
+            border-radius: var(--border-radius-md);
+            margin-bottom: calc(var(--spacing-unit) * 2.5);
+            font-size: 0.95em;
+        }
+        .ketcher-setup-note strong {
+            font-weight: 500;
+            color: #d35400; /* Darker orange */
+        }
+        .ketcher-setup-note ol {
+            margin-top: var(--spacing-unit);
+            margin-bottom: 0;
+            padding-left: calc(var(--spacing-unit) * 2.5);
+        }
+        .ketcher-setup-note li {
+            margin-bottom: calc(var(--spacing-unit) / 2);
+        }
+         .ketcher-setup-note a {
+            color: var(--accent-color);
+            font-weight: 500;
+            text-decoration: none;
+            border-bottom: 1px solid var(--accent-color);
+        }
+        .ketcher-setup-note a:hover {
+            color: #d35400;
+            border-color: #d35400;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>NMR Signal Predictor</h1>
+            <p>Visualize structures & predict NMR signals with an interactive spectrum.</p>
+        </header>
+
+        <div id="error-display" class="error-message" style="display:none;"></div>
+        
+        <div class="ketcher-setup-note">
+            <strong>Important for Ketcher:</strong>
+            <ol>
+                <li>Download Ketcher standalone ZIP from <a href="https://github.com/epam/ketcher/releases" target="_blank">Ketcher Releases</a>.</li>
+                <li>Unzip it. From the unzipped contents, find the `dist` folder.</li>
+                <li>Create a folder named `ketcher` in the <strong>same directory</strong> as this `nmr_predictor.html` file.</li>
+                <li>Copy all contents of Ketcher's `dist` folder into your new `ketcher` folder.</li>
+                <li>The path `ketcher/index.html` (relative to this HTML file) must be valid for the editor to load.</li>
+            </ol>
+        </div>
+        
+        <div id="status-messages" style="display:none;"> <!-- Initially hidden, shown by JS -->
+            Ketcher Status: <span id="ketcher-status" class="status-loading">Loading...</span>
+        </div>
+        
+        <div class="input-section-wrapper">
+            <section class="input-section">
+                <input type="text" id="smiles-input" placeholder="Enter SMILES or draw in editor">
+                <button id="process-button" disabled>Analyze</button>
+            </section>
+        </div>
+        <div class="example-smiles">
+            Examples:
+            <span onclick="setExampleSMILES('CCO')">Ethanol</span> |
+            <span onclick="setExampleSMILES('CC(=O)C')">Acetone</span> |
+            <span onclick="setExampleSMILES('c1ccccc1')">Benzene</span> |
+            <span onclick="setExampleSMILES('CC(C)Br')">2-Bromopropane</span>
+        </div>
+        <div id="molecular-formula-display"></div>
+
+
+        <div class="main-content">
+            <section class="structure-viewer">
+                <iframe id="ketcher-iframe" title="Ketcher Molecular Editor"></iframe>
+            </section>
+
+            <section class="results-section">
+                <div class="nmr-table-container" id="proton-nmr-results">
+                    <h3><sup>1</sup>H NMR Predictions</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Atom(s)</th>
+                                <th>Environment</th>
+                                <th>Shift (δ)</th>
+                                <th>Mult.</th>
+                                <th>Integ.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="proton-nmr-tbody"></tbody>
+                    </table>
+                    <canvas id="proton-nmr-chart" class="nmr-chart" width="600" height="250"></canvas>
+                </div>
+
+                <div class="nmr-table-container" id="carbon-nmr-results">
+                    <h3><sup>13</sup>C NMR Predictions</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Atom</th>
+                                <th>Environment</th>
+                                <th>Shift (δ)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="carbon-nmr-tbody"></tbody>
+                    </table>
+                    <canvas id="carbon-nmr-chart" class="nmr-chart" width="600" height="250"></canvas>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        // --- Existing JavaScript code remains the same ---
+        // ... (all your previous JS code for ketcher, parsing, prediction, chart drawing)
+        const ketcherFrame = document.getElementById('ketcher-iframe');
+        let ketcherInstance = null;
+
+        const processButton = document.getElementById('process-button');
+        const ketcherStatusEl = document.getElementById('ketcher-status');
+        const statusMessagesContainer = document.getElementById('status-messages'); // Get container
+        const smilesInput = document.getElementById('smiles-input');
+        const protonNmrTbody = document.getElementById('proton-nmr-tbody');
+        const carbonNmrTbody = document.getElementById('carbon-nmr-tbody');
+        const formulaDisplay = document.getElementById('molecular-formula-display');
+        const errorDisplay = document.getElementById('error-display');
+
+        const protonNmrChartCanvas = document.getElementById('proton-nmr-chart');
+        const carbonNmrChartCanvas = document.getElementById('carbon-nmr-chart');
+        const protonNmrChartCtx = protonNmrChartCanvas.getContext('2d');
+        const carbonNmrChartCtx = carbonNmrChartCanvas.getContext('2d');
+
+        const CHART_PADDING_LEFT = 50;
+        const CHART_PADDING_RIGHT = 30;
+        const CHART_PADDING_TOP = 30; 
+        const CHART_PADDING_BOTTOM = 50; 
+        
+        const PROTON_PPM_MIN = -1; 
+        const PROTON_PPM_MAX = 13;
+        const CARBON_PPM_MIN = -10;
+        const CARBON_PPM_MAX = 230;
+
+        const PEAK_BASE_HEIGHT_PROTON = 70; 
+        const PEAK_BASE_HEIGHT_CARBON = 100;
+        const MULTIPLET_LINE_SPACING_PX = 4; 
+
+        let AXIS_COLOR, PEAK_COLOR, TEXT_COLOR, CHART_BG_COLOR_CSS; // Renamed to avoid conflict
+
+        function updateChartColors() {
+            const styles = getComputedStyle(document.documentElement);
+            AXIS_COLOR = styles.getPropertyValue('--text-primary-color').trim(); // Use primary text for axis
+            PEAK_COLOR = styles.getPropertyValue('--secondary-color').trim();
+            TEXT_COLOR = styles.getPropertyValue('--text-primary-color').trim(); // Use primary text for labels
+            CHART_BG_COLOR_CSS = styles.getPropertyValue('--input-bg-color').trim(); // Get from CSS vars
+        }
+        
+        function showStatusMessage(type, message) {
+            ketcherStatusEl.textContent = message;
+            ketcherStatusEl.className = `status-${type}`;
+            statusMessagesContainer.className = `status-${type}`; // Apply class to container for bg/border
+            statusMessagesContainer.style.display = 'block';
+        }
+
+
+        ketcherFrame.src = './ketcher/index.html'; 
+
+         ketcherFrame.onload = () => {
+            console.log("Ketcher iframe onload event fired. Waiting a moment for Ketcher to fully initialize...");
+            showStatusMessage('loading', 'Ketcher Loading...'); // Show loading status
+            setTimeout(() => {
+                console.log("Attempting to access ketcher instance after delay.");
+                try {
+                    if (ketcherFrame.contentWindow && typeof ketcherFrame.contentWindow.ketcher === 'object' && ketcherFrame.contentWindow.ketcher !== null) {
+                        ketcherInstance = ketcherFrame.contentWindow.ketcher;
+                        console.log("Ketcher instance acquired:", ketcherInstance);
+                        showStatusMessage('success', 'Ketcher Ready!');
+                        processButton.disabled = false;
+                        updateChartColors(); 
+                        
+                        if (ketcherInstance && typeof ketcherInstance.setMolecule === 'function') {
+                            ketcherInstance.setMolecule('C') 
+                                .then(() => {
+                                    console.log("Ketcher: Default molecule set (methane).");
+                                })
+                                .catch(err => console.error("Ketcher: Error setting default molecule:", err));
+                        } else {
+                             console.warn("Ketcher instance seems to exist, but setMolecule function is not available (after delay).");
+                        }
+                    } else {
+                        // ... (rest of your error handling for ketcher init)
+                        showStatusMessage('error', 'Error initializing Ketcher. See console.');
+                        processButton.disabled = true;
+                        displayError( /* ... your detailed error message ... */ );
+                    }
+                } catch (e) {
+                    // ... (rest of your catch block)
+                    showStatusMessage('error', 'Error accessing Ketcher. Check console.');
+                    processButton.disabled = true;
+                    displayError(  `An unexpected error occurred while trying to access Ketcher: ${e.name}: ${e.message}. Check the browser console. Ensure you are using a local web server.` );
+                }
+            }, 1500);
+        };
+
+        ketcherFrame.onerror = (err) => {
+            console.error("Ketcher iframe onerror event fired:", err);
+            showStatusMessage('error', 'Failed to load Ketcher iframe. Check path & network.');
+            processButton.disabled = true;
+            displayError("ERROR: The Ketcher iframe itself failed to load. This often means the path to 'ketcher/index.html' is incorrect or the files are missing. Ensure the 'ketcher' folder is in the same directory as this HTML file.");
+        };
+        
+        processButton.addEventListener('click', handleProcessSMILES);
+        smilesInput.addEventListener('keypress', (event) => {
+            if (event.key === "Enter") {
+                if (!processButton.disabled) {
+                    handleProcessSMILES();
+                }
+            }
+        });
+
+        function setExampleSMILES(smiles) {
+            smilesInput.value = smiles;
+            if (!processButton.disabled) {
+                handleProcessSMILES();
+            }
+        }
+
+        function displayError(message) {
+            errorDisplay.textContent = message;
+            errorDisplay.style.display = 'block';
+             // Hide ketcher status when a major error is displayed
+            if (statusMessagesContainer) statusMessagesContainer.style.display = 'none';
+        }
+
+        function clearError() {
+            errorDisplay.textContent = '';
+            errorDisplay.style.display = 'none';
+        }
+        
+        function clearCharts() {
+            protonNmrChartCtx.clearRect(0, 0, protonNmrChartCanvas.width, protonNmrChartCanvas.height);
+            carbonNmrChartCtx.clearRect(0, 0, carbonNmrChartCanvas.width, carbonNmrChartCanvas.height);
+        }
+
+
+        async function handleProcessSMILES() {
+            clearError();
+            // If ketcher status was shown, potentially hide it or update it during processing.
+            // For now, let's assume it stays unless an error occurs.
+            if (statusMessagesContainer.style.display === 'block' && !ketcherStatusEl.classList.contains('status-error')) {
+                 // Optionally hide non-error ketcher status
+                 // statusMessagesContainer.style.display = 'none';
+            }
+
+
+            const smilesFromInput = smilesInput.value.trim();
+
+            if (!ketcherInstance) {
+                displayError("Ketcher is not ready. Please wait or check status messages and console.");
+                return;
+            }
+
+            protonNmrTbody.innerHTML = '';
+            carbonNmrTbody.innerHTML = '';
+            formulaDisplay.textContent = '';
+            clearCharts();
+
+            let molfile;
+            let operationSource = ""; 
+
+            try {
+                if (smilesFromInput) {
+                    operationSource = `SMILES input "${smilesFromInput}"`;
+                    console.log("Processing from SMILES input:", smilesFromInput);
+                    try {
+                        await ketcherInstance.setMolecule(smilesFromInput);
+                    } catch (e) {
+                        console.error("Error setting molecule from SMILES in Ketcher:", e);
+                        displayError(`Invalid SMILES string: "${smilesFromInput}". Ketcher reported: ${e.message || 'Unknown error'}. Please correct it or draw the structure.`);
+                        return; 
+                    }
+                    molfile = await ketcherInstance.getMolfile('v2000');
+                } else {
+                    operationSource = "current Ketcher drawing";
+                    console.log("Processing from current Ketcher drawing (SMILES input is empty).");
+                    molfile = await ketcherInstance.getMolfile('v2000');
+                }
+                
+                console.log(`Molfile received from ${operationSource} (first 100 chars):`, molfile.substring(0,100));
+                
+                const moleculeData = parseMolfile(molfile);
+                
+                if (!moleculeData || moleculeData.atoms.length === 0) {
+                    if (smilesFromInput) {
+                         displayError(`The provided SMILES "${smilesFromInput}" could not be resolved to a molecule with atoms or was invalid for prediction.`);
+                    } else {
+                         displayError("No molecule drawn in Ketcher, or the drawing is empty/invalid for prediction. Please draw a valid structure or enter a SMILES string.");
+                    }
+                    console.error(`Parsed molecule data is empty or null from ${operationSource}. Molfile:`, molfile);
+                    return;
+                }
+
+                const molecularFormula = calculateMolecularFormula(moleculeData.atoms);
+                formulaDisplay.textContent = `Molecular Formula: ${molecularFormula}`;
+                
+                if (!smilesFromInput && moleculeData.atoms.length > 0) {
+                    try {
+                        const currentKetcherSmiles = await ketcherInstance.getSmiles();
+                        if (currentKetcherSmiles) {
+                            smilesInput.value = currentKetcherSmiles;
+                            console.log("Updated SMILES input from Ketcher drawing:", currentKetcherSmiles);
+                        }
+                    } catch (e) {
+                        console.warn("Could not get/update SMILES from current Ketcher drawing:", e);
+                    }
+                }
+                
+                updateChartColors(); 
+                predictAndDisplayNMR(moleculeData);
+
+            } catch (error) {
+                console.error(`Error processing ${operationSource || 'structure'}:`, error);
+                let userMessage = error.message || `Could not process the structure from ${operationSource || 'input'}.`;
+                displayError(`Error: ${userMessage} Check the browser console for more details.`);
+                protonNmrTbody.innerHTML = '';
+                carbonNmrTbody.innerHTML = '';
+                formulaDisplay.textContent = '';
+                clearCharts();
+            }
+        }
+
+        function parseMolfile(molfileString) {
+            const lines = molfileString.split(/\r?\n/);
+            const atoms = [];
+            const bonds = [];
+
+            if (lines.length < 4) {
+                console.error("Molfile too short:", molfileString);
+                return null;
+            }
+
+            const countsLineText = lines[3];
+            if (!countsLineText) {
+                console.error("Molfile missing counts line (line 4). Molfile:", molfileString);
+                return null;
+            }
+            const countsLine = countsLineText.trim().split(/\s+/);
+            const numAtoms = parseInt(countsLine[0]);
+            const numBonds = parseInt(countsLine[1]);
+
+            if (isNaN(numAtoms) || isNaN(numBonds)) {
+                console.error("Invalid atom/bond counts in Molfile:", countsLineText);
+                return null;
+            }
+            if (numAtoms === 0) {
+                console.log("Molfile indicates an empty structure (0 atoms).");
+                return { atoms: [], bonds: [] };
+            }
+            
+            for (let i = 0; i < numAtoms; i++) {
+                const atomLineIndex = 4 + i;
+                if (atomLineIndex >= lines.length) {
+                    console.error(`Molfile ended prematurely. Expected atom line ${atomLineIndex}, but only ${lines.length} lines.`);
+                    return null;
+                }
+                const atomLine = lines[atomLineIndex];
+                const parts = atomLine.trim().split(/\s+/);
+                if (parts.length < 4) {
+                     console.error(`Malformed atom line ${atomLineIndex}: ${atomLine}`);
+                     return null; 
+                }
+                atoms.push({
+                    id: i + 1, 
+                    symbol: parts[3],
+                    x: parseFloat(parts[0]),
+                    y: parseFloat(parts[1]),
+                    z: parseFloat(parts[2]),
+                    charge: parseInt(parts[5]) || 0, 
+                    hydrogens: 0, 
+                    neighbors: [] 
+                });
+            }
+
+            for (let i = 0; i < numBonds; i++) {
+                const bondLineIndex = 4 + numAtoms + i;
+                 if (bondLineIndex >= lines.length) {
+                    console.error(`Molfile ended prematurely. Expected bond line ${bondLineIndex}, but only ${lines.length} lines.`);
+                    return null;
+                }
+                const bondLine = lines[bondLineIndex];
+                const parts = bondLine.trim().split(/\s+/);
+                 if (parts.length < 3) {
+                     console.error(`Malformed bond line ${bondLineIndex}: ${bondLine}`);
+                     return null; 
+                }
+                const atom1Id = parseInt(parts[0]);
+                const atom2Id = parseInt(parts[1]);
+                const bondType = parseInt(parts[2]);
+                bonds.push({ from: atom1Id, to: atom2Id, type: bondType });
+
+                const atom1 = atoms.find(a => a.id === atom1Id);
+                const atom2 = atoms.find(a => a.id === atom2Id);
+                if (atom1 && atom2) { 
+                    atom1.neighbors.push({ atomId: atom2Id, bondType: bondType, atomSymbol: atom2.symbol });
+                    atom2.neighbors.push({ atomId: atom1Id, bondType: bondType, atomSymbol: atom1.symbol });
+                } else {
+                    console.warn(`Could not find atoms for bond: ${atom1Id}-${atom2Id}`);
+                }
+            }
+            
+            atoms.forEach(atom => {
+                if (atom.symbol !== 'H') {
+                    let typicalValence = 0;
+                    switch (atom.symbol) {
+                        case 'C': typicalValence = 4; break;
+                        case 'N': typicalValence = 3; break; 
+                        case 'O': typicalValence = 2; break;
+                        case 'S': typicalValence = 2; break; 
+                        case 'P': typicalValence = 3; break; 
+                        case 'F': case 'Cl': case 'Br': case 'I': typicalValence = 1; break;
+                        default: typicalValence = 0; 
+                    }
+
+                    let currentValenceUsed = 0;
+                    atom.neighbors.forEach(n => currentValenceUsed += n.bondType);
+                    
+                    let numHydrogens;
+                    if (atom.symbol === 'N') {
+                        typicalValence = atom.charge === 1 ? 4 : (atom.charge === -1 ? 2 : 3);
+                    } else if (atom.symbol === 'O') {
+                        typicalValence = atom.charge === 1 ? 3 : (atom.charge === -1 ? 1 : 2);
+                    } else if (atom.symbol === 'S') { 
+                        typicalValence = atom.charge === 1 ? 3 : (atom.charge === -1 ? 1 : 2); 
+                    } else if (atom.symbol === 'C') {
+                        if (atom.charge === 1 || atom.charge === -1) typicalValence = 3;
+                    }
+                    numHydrogens = typicalValence - currentValenceUsed;
+                    atom.hydrogens = Math.max(0, numHydrogens);
+                }
+            });
+            return { atoms, bonds };
+        }
+
+        function calculateMolecularFormula(atoms) {
+            const counts = {};
+            let totalHydrogens = 0;
+            atoms.forEach(atom => {
+                if (atom.symbol === 'H') { 
+                    totalHydrogens++;
+                } else {
+                    counts[atom.symbol] = (counts[atom.symbol] || 0) + 1;
+                    totalHydrogens += atom.hydrogens;
+                }
+            });
+            if (totalHydrogens > 0) counts['H'] = totalHydrogens;
+            let formula = "";
+            if (counts.C) formula += `C${counts.C > 1 ? counts.C : ''}`;
+            if (counts.H) formula += `H${counts.H > 1 ? counts.H : ''}`;
+            Object.keys(counts).sort().forEach(symbol => {
+                if (symbol !== 'C' && symbol !== 'H') {
+                    formula += `${symbol}${counts[symbol] > 1 ? counts[symbol] : ''}`;
+                }
+            });
+            return formula;
+        }
+
+        function predictAndDisplayNMR(moleculeData) {
+            protonNmrTbody.innerHTML = ''; 
+            carbonNmrTbody.innerHTML = '';
+
+            const { atoms, bonds } = moleculeData;
+            const protonSignals = [];
+            const carbonSignals = [];
+
+            atoms.forEach(atom => {
+                if (atom.symbol === 'C') {
+                    const { shiftRange, environment } = predictCarbonShift(atom, atoms, bonds);
+                    const row = carbonNmrTbody.insertRow();
+                    row.insertCell().textContent = `C${atom.id}`;
+                    row.insertCell().textContent = environment;
+                    row.insertCell().textContent = shiftRange;
+                    carbonSignals.push({ shiftString: shiftRange, label: `C${atom.id}` });
+                }
+            });
+
+            atoms.forEach(atom => {
+                if (atom.hydrogens > 0) {
+                    let signalData = {};
+                    if (atom.symbol === 'C') {
+                        const { shiftRange, environment, multiplicity } = predictProtonShiftAndMultiplicity(atom, atoms, bonds);
+                        signalData = {
+                            label: `H on C${atom.id}`,
+                            idLabel: `C${atom.id}`,
+                            environment,
+                            shiftString: shiftRange,
+                            multiplicity,
+                            integration: atom.hydrogens
+                        };
+                    } else if (['O', 'N', 'S'].includes(atom.symbol)) { 
+                        let shiftRange = "1 - 5 (broad, exchangeable)";
+                        let environment = `${atom.hydrogens}H on ${atom.symbol}${atom.id} (-${atom.symbol}H)`;
+                        let multiplicity = "s (broad)";
+
+                        if (atom.symbol === 'N') {
+                             const isAmide = atom.neighbors.some(n => {
+                                const neighborAtom = getAtomById(n.atomId, atoms);
+                                if (neighborAtom && neighborAtom.symbol === 'C' && n.bondType === 1) {
+                                    return neighborAtom.neighbors.some(cn => cn.atomSymbol === 'O' && cn.bondType === 2);
+                                }
+                                return false;
+                            });
+                            if (isAmide) {
+                                shiftRange = "5.0 - 9.0 (Amide NH)";
+                                environment = `Amide H on N${atom.id}`;
+                            } else {
+                                environment = `Amine H on N${atom.id}`;
+                            }
+                        } else if (atom.symbol === 'O') {
+                            const isCarboxylicAcid = atom.neighbors.some(n => {
+                                const neighborAtom = getAtomById(n.atomId, atoms);
+                                return neighborAtom && neighborAtom.symbol === 'C' && n.bondType === 1 &&
+                                       neighborAtom.neighbors.some(cn => cn.atomSymbol === 'O' && cn.bondType === 2);
+                            });
+                            if (isCarboxylicAcid) {
+                                shiftRange = "10 - 13 (Carboxylic Acid OH, very broad)";
+                                environment = `Acid H on O${atom.id}`;
+                            } else {
+                                environment = `Alcohol/Phenol H on O${atom.id}`;
+                            }
+                        } else if (atom.symbol === 'S'){
+                            environment = `Thiol H on S${atom.id}`;
+                            shiftRange = "1 - 2.5 (Thiol SH)";
+                        }
+                        signalData = {
+                            label: `H on ${atom.symbol}${atom.id}`,
+                            idLabel: `${atom.symbol}${atom.id}`,
+                            environment,
+                            shiftString: shiftRange,
+                            multiplicity,
+                            integration: atom.hydrogens
+                        };
+                    }
+                    if (Object.keys(signalData).length > 0) {
+                        protonSignals.push(signalData);
+                        const row = protonNmrTbody.insertRow();
+                        row.insertCell().textContent = signalData.label;
+                        row.insertCell().textContent = signalData.environment;
+                        row.insertCell().textContent = signalData.shiftString;
+                        row.insertCell().textContent = signalData.multiplicity;
+                        row.insertCell().textContent = signalData.integration;
+                    }
+                }
+            });
+            
+            drawProtonNMRChart(protonSignals);
+            drawCarbonNMRChart(carbonSignals);
+        }
+        
+        function getAtomById(id, atoms) {
+            return atoms.find(a => a.id === id);
+        }
+
+        function getCarbonEnvironment(carbonAtom, allAtoms, allBonds) {
+            let environment = `C (${carbonAtom.hydrogens}H)`;
+            let isAromatic = false;
+            let isAlkene = false;
+            let isAlkyne = false;
+            let attachedToOxygen = 0; 
+            let attachedToNitrogen = 0;
+            let attachedToHalogen = 0;
+            let isCarbonylCarbon = false; 
+            let carbonylTypeDetail = "";
+
+            carbonAtom.neighbors.forEach(neighborInfo => {
+                const neighborAtom = getAtomById(neighborInfo.atomId, allAtoms);
+                if (!neighborAtom) return;
+
+                if (neighborInfo.bondType === 4) isAromatic = true; 
+                if (neighborAtom.symbol === 'C') {
+                    if (neighborInfo.bondType === 2) isAlkene = true;
+                    if (neighborInfo.bondType === 3) isAlkyne = true;
+                } else if (neighborAtom.symbol === 'O') {
+                    attachedToOxygen++;
+                    if (neighborInfo.bondType === 2) { 
+                        isCarbonylCarbon = true;
+                    }
+                } else if (neighborAtom.symbol === 'N') {
+                    attachedToNitrogen++;
+                } else if (['F', 'Cl', 'Br', 'I'].includes(neighborAtom.symbol)) {
+                    attachedToHalogen++;
+                }
+            });
+            
+            if (isAromatic) environment = "Aromatic C";
+            else if (isCarbonylCarbon) {
+                carbonylTypeDetail = "Carbonyl C=O";
+                if (carbonAtom.hydrogens > 0) carbonylTypeDetail = "Aldehyde C=O";
+                else {
+                    const nonOxygenNeighbors = carbonAtom.neighbors.filter(n => !(getAtomById(n.atomId, allAtoms).symbol === 'O' && n.bondType === 2));
+                    const neighborSymbols = nonOxygenNeighbors.map(n => getAtomById(n.atomId, allAtoms).symbol);
+
+                    if (neighborSymbols.every(s => s === 'C')) carbonylTypeDetail = "Ketone C=O";
+                    else if (neighborSymbols.some(s => s === 'O')) carbonylTypeDetail = "Acid/Ester/Anhydride C=O";
+                    else if (neighborSymbols.some(s => s === 'N')) carbonylTypeDetail = "Amide C=O";
+                }
+                environment = carbonylTypeDetail;
+            }
+            else if (isAlkyne) environment = `Alkyne C≡C (-CH${carbonAtom.hydrogens})`;
+            else if (isAlkene) environment = `Alkene C=C (-CH${carbonAtom.hydrogens})`;
+            else if (attachedToOxygen > 0) environment = `C-O (Alcohol/Ether, ${attachedToOxygen}O, -CH${carbonAtom.hydrogens})`;
+            else if (attachedToNitrogen > 0) environment = `C-N (Amine, ${attachedToNitrogen}N, -CH${carbonAtom.hydrogens})`;
+            else if (attachedToHalogen > 0) environment = `C-X (Halide, ${attachedToHalogen}X, -CH${carbonAtom.hydrogens})`;
+            else { 
+                if (carbonAtom.hydrogens === 3) environment = "Alkyl CH3";
+                else if (carbonAtom.hydrogens === 2) environment = "Alkyl CH2";
+                else if (carbonAtom.hydrogens === 1) environment = "Alkyl CH";
+                else if (carbonAtom.hydrogens === 0) environment = "Alkyl Quaternary C";
+            }
+            return { environment, isAromatic, isAlkene, isAlkyne, attachedToOxygen, isCarbonylCarbon, carbonylTypeDetail, attachedToNitrogen, attachedToHalogen };
+        }
+
+        function predictCarbonShift(carbonAtom, allAtoms, allBonds) {
+            const env = getCarbonEnvironment(carbonAtom, allAtoms, allBonds);
+            let shiftRange = "5 - 50 (Alkyl Default)";
+
+            if (env.isAromatic) shiftRange = "110 - 160";
+            else if (env.isCarbonylCarbon) {
+                if (env.carbonylTypeDetail.includes("Ketone") || env.carbonylTypeDetail.includes("Aldehyde")) shiftRange = "190 - 220";
+                else if (env.carbonylTypeDetail.includes("Acid/Ester") || env.carbonylTypeDetail.includes("Amide")) shiftRange = "160 - 185";
+            }
+            else if (env.isAlkyne) shiftRange = "65 - 90";
+            else if (env.isAlkene) shiftRange = "100 - 150";
+            else if (env.environment.includes("C-O")) shiftRange = "40 - 80";
+            else if (env.environment.includes("C-N")) shiftRange = "20 - 65"; 
+            else if (env.environment.includes("C-X")) {
+                shiftRange = "10 - 90 (C-X, varies)"; 
+            }
+            else { 
+                if (carbonAtom.symbol === 'C' && carbonAtom.hydrogens === 4) shiftRange = "-5 - 15 (CH4)"; 
+                else if (carbonAtom.hydrogens === 3) shiftRange = "5 - 30 (CH3)";
+                else if (carbonAtom.hydrogens === 2) shiftRange = "15 - 50 (CH2)"; 
+                else if (carbonAtom.hydrogens === 1) shiftRange = "25 - 60 (CH)"; 
+                else shiftRange = "30 - 60 (Quat. C)";
+            }
+            return { shiftRange, environment: env.environment };
+        }
+
+        function predictProtonShiftAndMultiplicity(carbonAtom, allAtoms, allBonds) {
+            const carbonEnvInfo = getCarbonEnvironment(carbonAtom, allAtoms, allBonds);
+            let shiftRange = "0.5 - 2.0 (Alkyl Default)";
+            let specificEnv = `H on ${carbonEnvInfo.environment}`;
+
+            if (carbonEnvInfo.carbonylTypeDetail.includes("Aldehyde")) { 
+                shiftRange = "9.0 - 10.0";
+                specificEnv = "Aldehyde H";
+            } else if (carbonEnvInfo.isAromatic) {
+                shiftRange = "6.5 - 8.5";
+                specificEnv = "Aromatic H";
+            } else if (carbonEnvInfo.isAlkene) {
+                shiftRange = "4.5 - 6.5";
+                specificEnv = "Vinylic H (on C=C)";
+            } else if (carbonEnvInfo.isAlkyne && carbonAtom.hydrogens > 0) { 
+                shiftRange = "1.8 - 3.0";
+                specificEnv = "Alkynyl H (on C≡CH)";
+            } else if (carbonEnvInfo.environment.includes("C-O")) { 
+                shiftRange = "3.2 - 4.5";
+                specificEnv = `H on C adjacent to O (e.g. R-CH${carbonAtom.hydrogens}-O)`;
+            } else if (carbonEnvInfo.environment.includes("C-N")) { 
+                shiftRange = "2.2 - 3.5";
+                specificEnv = `H on C adjacent to N (e.g. R-CH${carbonAtom.hydrogens}-N)`;
+            } else if (carbonEnvInfo.environment.includes("C-X")) { 
+                shiftRange = "2.5 - 4.5 (H-C-X, varies)";
+                specificEnv = `H on C adjacent to Halogen (e.g. R-CH${carbonAtom.hydrogens}-X)`;
+            } else {
+                let isAlphaToCarbonyl = false;
+                let isBenzylic = false;
+                let isAllylic = false;
+
+                carbonAtom.neighbors.forEach(neighborInfo => {
+                    const adjHeavyAtom = getAtomById(neighborInfo.atomId, allAtoms);
+                    if (adjHeavyAtom && adjHeavyAtom.symbol === 'C') { 
+                        const adjCarbonEnv = getCarbonEnvironment(adjHeavyAtom, allAtoms, allBonds);
+                        if (adjCarbonEnv.isCarbonylCarbon) isAlphaToCarbonyl = true;
+                        if (adjCarbonEnv.isAromatic) isBenzylic = true;
+                        if (adjCarbonEnv.isAlkene) isAllylic = true;
+                    }
+                });
+
+                if (isAlphaToCarbonyl) {
+                    shiftRange = "2.0 - 2.7 (α to C=O)";
+                    specificEnv = `H α to Carbonyl (C=O) on C${carbonAtom.id}`;
+                } else if (isBenzylic) {
+                    shiftRange = "2.2 - 3.0 (Benzylic)";
+                    specificEnv = `Benzylic H (α to Aromatic) on C${carbonAtom.id}`;
+                } else if (isAllylic) {
+                    shiftRange = "1.6 - 2.6 (Allylic)";
+                    specificEnv = `Allylic H (α to C=C) on C${carbonAtom.id}`;
+                } else { 
+                    if (carbonAtom.symbol === 'C' && carbonAtom.hydrogens === 4) { shiftRange = "0.2 - 1.0 (CH4)"; specificEnv = `Methane H on C${carbonAtom.id}`; } 
+                    else if (carbonAtom.hydrogens === 3) { shiftRange = "0.7 - 1.5 (CH3)"; specificEnv = `Methyl H on C${carbonAtom.id}`; }
+                    else if (carbonAtom.hydrogens === 2) { shiftRange = "1.2 - 1.8 (CH2)"; specificEnv = `Methylene H on C${carbonAtom.id}`; }
+                    else if (carbonAtom.hydrogens === 1) { shiftRange = "1.4 - 2.0 (CH)"; specificEnv = `Methine H on C${carbonAtom.id}`; }
+                }
+            }
+
+            let neighboringProtons = 0;
+            carbonAtom.neighbors.forEach(neighborInfo => {
+                const adjacentAtom = getAtomById(neighborInfo.atomId, allAtoms);
+                if (adjacentAtom && adjacentAtom.symbol === 'C') { 
+                    neighboringProtons += adjacentAtom.hydrogens;
+                }
+            });
+            
+            let multiplicity = "m"; 
+            const n = neighboringProtons;
+            if (n === 0) multiplicity = "s (singlet)";
+            else if (n === 1) multiplicity = "d (doublet)";
+            else if (n === 2) multiplicity = "t (triplet)";
+            else if (n === 3) multiplicity = "q (quartet)";
+            else if (n === 4) multiplicity = "quint (quintet)";
+            else if (n === 5) multiplicity = "sext (sextet)";
+            else if (n === 6) multiplicity = "sept (septet)";
+            if ( (carbonAtom.symbol === 'O' || carbonAtom.symbol === 'N' || carbonAtom.symbol === 'S') && carbonAtom.hydrogens > 0 ) {
+                multiplicity = "s (broad)";
+            }
+
+            return { shiftRange, environment: specificEnv, multiplicity };
+        }
+
+        function parseShiftToNumeric(shiftString) {
+            if (!shiftString) return null;
+            const rangeMatch = shiftString.match(/(-?\d+\.?\d*)\s*-\s*(-?\d+\.?\d*)/);
+            if (rangeMatch && rangeMatch.length >= 3) {
+                const val1 = parseFloat(rangeMatch[1]);
+                const val2 = parseFloat(rangeMatch[2]);
+                return (val1 + val2) / 2;
+            }
+            const singleValMatch = shiftString.match(/^(-?\d+\.?\d*)/);
+            if (singleValMatch && singleValMatch.length >= 2) {
+                return parseFloat(singleValMatch[1]);
+            }
+            console.warn("Could not parse shift string to numeric:", shiftString);
+            return null;
+        }
+
+        function ppmToX(ppm, minPPM, maxPPM, chartWidth) {
+            const plotWidth = chartWidth - CHART_PADDING_LEFT - CHART_PADDING_RIGHT;
+            return CHART_PADDING_LEFT + plotWidth * ( (maxPPM - ppm) / (maxPPM - minPPM) );
+        }
+
+        function drawAxis(ctx, minPPM, maxPPM, yBaseline, chartWidth, chartHeight, label) {
+            ctx.strokeStyle = AXIS_COLOR;
+            ctx.fillStyle = TEXT_COLOR; // Ensure text color is set for axis labels
+            ctx.lineWidth = 1;
+            ctx.font = "10px " + getComputedStyle(document.body).fontFamily;
+
+            ctx.beginPath();
+            ctx.moveTo(CHART_PADDING_LEFT, yBaseline);
+            ctx.lineTo(chartWidth - CHART_PADDING_RIGHT, yBaseline);
+            ctx.stroke();
+
+            const numTicks = 10; 
+            const ppmRange = maxPPM - minPPM;
+            let tickIntervalGuess = Math.max(1, Math.round(ppmRange / numTicks));
+            // Make tick interval a nice number (1, 2, 5, 10, 20, 50, 100...)
+            if (ppmRange / numTicks > 50) tickIntervalGuess = 50;
+            else if (ppmRange / numTicks > 20) tickIntervalGuess = 20;
+            else if (ppmRange / numTicks > 10) tickIntervalGuess = 10;
+            else if (ppmRange / numTicks > 5) tickIntervalGuess = 5;
+            else if (ppmRange / numTicks > 2) tickIntervalGuess = 2;
+            else tickIntervalGuess = 1;
+            
+            for (let ppm = Math.ceil(minPPM / tickIntervalGuess) * tickIntervalGuess; ppm <= maxPPM; ppm += tickIntervalGuess) {
+                if (ppm < minPPM && ppm !== 0) continue; // Allow 0 PPM tick even if minPPM is slightly positive
+                const x = ppmToX(ppm, minPPM, maxPPM, chartWidth);
+                ctx.beginPath();
+                ctx.moveTo(x, yBaseline);
+                ctx.lineTo(x, yBaseline + 5);
+                ctx.stroke();
+                ctx.textAlign = "center";
+                ctx.fillText(ppm.toString(), x, yBaseline + 15);
+            }
+
+            ctx.textAlign = "right";
+            ctx.fillText("δ (ppm)", chartWidth - CHART_PADDING_RIGHT, yBaseline + 30);
+        }
+        
+        const multiplicityPatterns = {
+            's': { lines: 1, ratios: [1] },
+            'd': { lines: 2, ratios: [1, 1] },
+            't': { lines: 3, ratios: [1, 2, 1] },
+            'q': { lines: 4, ratios: [1, 3, 3, 1] },
+            'quint': { lines: 5, ratios: [1, 4, 6, 4, 1] },
+            'sext': { lines: 6, ratios: [1, 5, 10, 10, 5, 1] },
+            'sept': { lines: 7, ratios: [1, 6, 15, 20, 15, 6, 1] },
+            'm': { lines: 1, ratios: [1] } 
+        };
+
+        function drawProtonNMRChart(signals) {
+            const ctx = protonNmrChartCtx;
+            const canvas = protonNmrChartCanvas;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const yBaseline = canvas.height - CHART_PADDING_BOTTOM;
+            drawAxis(ctx, PROTON_PPM_MIN, PROTON_PPM_MAX, yBaseline, canvas.width, canvas.height, "1H NMR");
+
+            ctx.strokeStyle = PEAK_COLOR;
+            ctx.lineWidth = 1.5;
+
+            signals.forEach(signal => {
+                const ppmValue = parseShiftToNumeric(signal.shiftString);
+                if (ppmValue === null || ppmValue < PROTON_PPM_MIN || ppmValue > PROTON_PPM_MAX) return;
+
+
+                const x_center = ppmToX(ppmValue, PROTON_PPM_MIN, PROTON_PPM_MAX, canvas.width);
+                const shortMultiplicity = signal.multiplicity.split(' ')[0];
+                const pattern = multiplicityPatterns[shortMultiplicity] || multiplicityPatterns['s']; 
+                
+                const maxRatio = Math.max(...pattern.ratios);
+                const totalLinesWidth = (pattern.lines - 1) * MULTIPLET_LINE_SPACING_PX;
+                let current_x = x_center - totalLinesWidth / 2;
+
+                for (let i = 0; i < pattern.lines; i++) {
+                    const peakHeight = (pattern.ratios[i] / maxRatio) * PEAK_BASE_HEIGHT_PROTON;
+                    ctx.beginPath();
+                    ctx.moveTo(current_x, yBaseline);
+                    ctx.lineTo(current_x, yBaseline - peakHeight);
+                    ctx.stroke();
+                    if (pattern.lines > 1) {
+                        current_x += MULTIPLET_LINE_SPACING_PX;
+                    }
+                }
+                
+                if (signal.integration) {
+                    ctx.fillStyle = TEXT_COLOR; // Ensure text color is set for integration labels
+                    ctx.font = "10px " + getComputedStyle(document.body).fontFamily;
+                    ctx.textAlign = "center";
+                    ctx.fillText(signal.integration.toString() + "H", x_center, yBaseline - PEAK_BASE_HEIGHT_PROTON - 5);
+                }
+            });
+        }
+
+        function drawCarbonNMRChart(signals) {
+            const ctx = carbonNmrChartCtx;
+            const canvas = carbonNmrChartCanvas;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const yBaseline = canvas.height - CHART_PADDING_BOTTOM;
+            drawAxis(ctx, CARBON_PPM_MIN, CARBON_PPM_MAX, yBaseline, canvas.width, canvas.height, "13C NMR");
+
+            ctx.strokeStyle = PEAK_COLOR;
+            ctx.lineWidth = 1.5;
+
+            signals.forEach(signal => {
+                const ppmValue = parseShiftToNumeric(signal.shiftString);
+                if (ppmValue === null || ppmValue < CARBON_PPM_MIN || ppmValue > CARBON_PPM_MAX) return;
+
+                const x = ppmToX(ppmValue, CARBON_PPM_MIN, CARBON_PPM_MAX, canvas.width);
+                ctx.beginPath();
+                ctx.moveTo(x, yBaseline);
+                ctx.lineTo(x, yBaseline - PEAK_BASE_HEIGHT_CARBON);
+                ctx.stroke();
+            });
+        }
+
+    </script>
+</body>
+</html>

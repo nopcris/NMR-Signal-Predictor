@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NMR Signal Predictor</title>
+    <style>
+        :root {
+            --primary-color: #3498db; /* Bright Blue */
+            --secondary-color: #2ecc71; /* Bright Green */
+            --bg-color: #2c3e50; /* Dark Slate Blue */
+            --text-color: #ecf0f1; /* Light Gray */
+            --card-bg-color: #34495e; /* Lighter Slate Blue */
+            --border-color: #4a6178;
+            --input-bg-color: #4a6178;
+            --input-text-color: #ecf0f1;
+            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            --disabled-color: #7f8c8d;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: var(--card-bg-color);
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 15px;
+        }
+
+        header h1 {
+            color: var(--primary-color);
+            margin: 0;
+            font-size: 2.5em;
+        }
+        header p {
+            color: #bdc3c7; /* Lighter text for subtitle */
+        }
+
+        .input-section {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 10px; /* Reduced margin */
+            padding: 20px;
+            background-color: var(--bg-color);
+            border-radius: 8px;
+        }
+
+        #smiles-input {
+            flex-grow: 1;
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            font-size: 1em;
+            background-color: var(--input-bg-color);
+            color: var(--input-text-color);
+        }
+
+        #smiles-input::placeholder {
+            color: #95a5a6;
+        }
+
+        #process-button {
+            padding: 12px 25px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+        }
+
+        #process-button:hover:not(:disabled) {
+            background-color: #2980b9; /* Darker blue */
+        }
+        #process-button:disabled {
+            background-color: var(--disabled-color);
+            cursor: not-allowed;
+        }
+
+        #status-messages {
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        #ketcher-status {
+            font-weight: bold;
+        }
+        .status-loading { color: #f39c12; /* Orange */ }
+        .status-error { color: #e74c3c; /* Red */ }
+        .status-success { color: var(--secondary-color); /* Green */ }
+
+
+        #molecular-formula-display {
+            margin-top: 10px;
+            font-weight: bold;
+            color: var(--secondary-color);
+            min-height: 20px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .main-content {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap; /* Allow wrapping on smaller screens */
+        }
+
+        .structure-viewer {
+            flex: 1;
+            min-width: 300px; /* Ensure it has a minimum width */
+            min-height: 400px; /* Ensure it has a minimum height */
+            height: 450px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        #ketcher-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .results-section {
+            flex: 1.5; /* More space for results */
+            min-width: 300px; /* Ensure it has a minimum width */
+        }
+
+        .nmr-table-container {
+            margin-bottom: 25px;
+            padding: 15px;
+            background-color: var(--bg-color);
+            border-radius: 8px;
+        }
+        
+        .nmr-table-container h3 {
+            color: var(--secondary-color);
+            margin-top: 0;
+            border-bottom: 1px solid var(--secondary-color);
+            padding-bottom: 8px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: var(--primary-color);
+            color: white;
+            font-weight: bold;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #3e576f;
+        }
+        tr:hover {
+            background-color: #4a6178;
+        }
+
+        .error-message {
+            color: #e74c3c; /* Red for errors */
+            font-weight: bold;
+            padding: 10px;
+            background-color: rgba(231, 76, 60, 0.1);
+            border: 1px solid #e74c3c;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .example-smiles {
+            font-size: 0.9em;
+            color: #bdc3c7;
+            margin-top: 0px;
+            margin-bottom: 20px; /* Added margin */
+            text-align: center;
+        }
+        .example-smiles span {
+            cursor: pointer;
+            text-decoration: underline;
+            margin: 0 5px;
+        }
+        .example-smiles span:hover {
+            color: var(--secondary-color);
+        }
+
+        .ketcher-setup-note {
+            background-color: #f39c1220; /* Light orange background */
+            border: 1px solid #f39c12;
+            color: #f39c12; /* Orange text */
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+        }
+        .ketcher-setup-note strong {
+            color: #d35400; /* Darker orange */
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>NMR Signal Predictor</h1>
+            <p>Visualize molecular structures and get approximate NMR signal predictions.</p>
+        </header>
+
+        <div id="error-display" class="error-message" style="display:none;"></div>
+        
+        <div id="status-messages">
+            Ketcher Status: <span id="ketcher-status" class="status-loading">Loading...</span>
+        </div>
+        
+        <div class="ketcher-setup-note">
+            <strong>Important for Ketcher:</strong>
+            <ol>
+                <li>Download Ketcher standalone ZIP from <a href="https://github.com/epam/ketcher/releases" target="_blank" style="color: #f39c12;">Ketcher Releases</a>.</li>
+                <li>Unzip it. From the unzipped contents, find the `dist` folder.</li>
+                <li>Create a folder named `ketcher` in the <strong>same directory</strong> as this `nmr_predictor.html` file.</li>
+                <li>Copy all contents of Ketcher's `dist` folder into your new `ketcher` folder.</li>
+                <li>The path `ketcher/index.html` (relative to this HTML file) must be valid.</li>
+            </ol>
+        </div>
+
+
+        <section class="input-section">
+            <input type="text" id="smiles-input" placeholder="Enter SMILES string (e.g., CCO for ethanol)">
+            <button id="process-button" disabled>Analyze</button>
+        </section>
+        <div class="example-smiles">
+            Examples:
+            <span onclick="setExampleSMILES('CCO')">Ethanol (CCO)</span> |
+            <span onclick="setExampleSMILES('CC(=O)C')">Acetone (CC(=O)C)</span> |
+            <span onclick="setExampleSMILES('c1ccccc1')">Benzene (c1ccccc1)</span> |
+            <span onclick="setExampleSMILES('CC(C)Br')">2-Bromopropane (CC(C)Br)</span>
+        </div>
+        <div id="molecular-formula-display"></div>
+
+
+        <div class="main-content">
+            <section class="structure-viewer">
+                <iframe id="ketcher-iframe" title="Ketcher Molecular Editor"></iframe>
+            </section>
+
+            <section class="results-section">
+                <div class="nmr-table-container" id="proton-nmr-results">
+                    <h3><sup>1</sup>H NMR Predictions</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Atom(s) (C Index)</th>
+                                <th>Environment</th>
+                                <th>Approx. Shift (δ, ppm)</th>
+                                <th>Multiplicity</th>
+                                <th>Integration</th>
+                            </tr>
+                        </thead>
+                        <tbody id="proton-nmr-tbody">
+                            <!-- Data will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="nmr-table-container" id="carbon-nmr-results">
+                    <h3><sup>13</sup>C NMR Predictions</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Atom (C Index)</th>
+                                <th>Environment</th>
+                                <th>Approx. Shift (δ, ppm)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="carbon-nmr-tbody">
+                            <!-- Data will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        const ketcherFrame = document.getElementById('ketcher-iframe');
+        let ketcherInstance = null;
+
+        const processButton = document.getElementById('process-button');
+        const ketcherStatusEl = document.getElementById('ketcher-status');
+        const smilesInput = document.getElementById('smiles-input');
+        const protonNmrTbody = document.getElementById('proton-nmr-tbody');
+        const carbonNmrTbody = document.getElementById('carbon-nmr-tbody');
+        const formulaDisplay = document.getElementById('molecular-formula-display');
+        const errorDisplay = document.getElementById('error-display');
+
+        // Set Ketcher source and wait for it to load
+        ketcherFrame.src = './ketcher/index.html'; // Path to your Ketcher instance
+
+         ketcherFrame.onload = () => {
+            console.log("Ketcher iframe onload event fired. Waiting a moment for Ketcher to fully initialize...");
+
+            // Try to access ketcher after a short delay, as it might not be ready immediately on iframe.onload
+            setTimeout(() => {
+                console.log("Attempting to access ketcher instance after delay.");
+                try {
+                    // Check if contentWindow and ketcher object exist
+                    if (ketcherFrame.contentWindow && typeof ketcherFrame.contentWindow.ketcher === 'object' && ketcherFrame.contentWindow.ketcher !== null) {
+                        ketcherInstance = ketcherFrame.contentWindow.ketcher;
+                        console.log("Ketcher instance acquired:", ketcherInstance);
+                        ketcherStatusEl.textContent = "Ready!";
+                        ketcherStatusEl.className = "status-success";
+                        processButton.disabled = false;
+                        
+                        if (ketcherInstance && typeof ketcherInstance.setMolecule === 'function') {
+                            ketcherInstance.setMolecule('C') // Display methane initially
+                                .then(() => console.log("Ketcher: Default molecule set."))
+                                .catch(err => console.error("Ketcher: Error setting default molecule:", err));
+                        } else {
+                             console.warn("Ketcher instance seems to exist, but setMolecule function is not available (after delay).");
+                        }
+
+                    } else {
+                        // Detailed logging if ketcher object is still not found
+                        let ketcherContentWindowInfo = "ketcherFrame.contentWindow is null or undefined.";
+                        let ketcherObjectInfo = "ketcherFrame.contentWindow.ketcher is undefined.";
+
+                        if (ketcherFrame.contentWindow) {
+                            ketcherContentWindowInfo = `ketcherFrame.contentWindow is available (URL: ${ketcherFrame.contentWindow.location.href}).`;
+                            if (typeof ketcherFrame.contentWindow.ketcher !== 'undefined') {
+                                ketcherObjectInfo = `ketcherFrame.contentWindow.ketcher exists but has type: ${typeof ketcherFrame.contentWindow.ketcher} (value: ${ketcherFrame.contentWindow.ketcher}). Expected an object.`;
+                            } else {
+                                ketcherObjectInfo = "ketcherFrame.contentWindow.ketcher is strictly undefined. Ketcher's API object was not found on its window.";
+                            }
+                        }
+                        
+                        console.error(
+                            "Failed to get Ketcher instance from iframe (after delay).\n" +
+                            `Details:\n  - ${ketcherContentWindowInfo}\n  - ${ketcherObjectInfo}`
+                        );
+
+                        ketcherStatusEl.textContent = "Error initializing Ketcher. See console.";
+                        ketcherStatusEl.className = "status-error";
+                        processButton.disabled = true;
+                        displayError(
+                            "CRITICAL ERROR: Ketcher molecular editor loaded, but its API ('ketcher' object) could not be found or is not the expected type.\n\n" +
+                            "TROUBLESHOOTING STEPS:\n" +
+                            "1. Open Developer Tools (F12) and go to the 'Console' tab.\n" +
+                            "2. In the console's context selector (often a dropdown, may say 'top'), **CHOOSE 'ketcher/index.html'** (or the iframe's context).\n" +
+                            "3. **Look for any RED ERROR MESSAGES in that specific iframe console.** These errors from Ketcher itself are key.\n" +
+                            "4. Verify your 'ketcher' folder contains the complete 'dist' contents from a Ketcher standalone download.\n" +
+                            "5. Check the 'Network' tab (with 'ketcher/index.html' context) for any failed (404) resource loads for Ketcher."
+                        );
+                    }
+                } catch (e) {
+                    // This catch block is mainly for unexpected errors during access.
+                    // The cross-origin error should be resolved by using a local server.
+                    console.error("Error accessing Ketcher instance (within setTimeout):", e);
+                    ketcherStatusEl.textContent = "Error accessing Ketcher. Check console.";
+                    ketcherStatusEl.className = "status-error";
+                    processButton.disabled = true;
+                    displayError(`An unexpected error occurred while trying to access Ketcher: ${e.name}: ${e.message}. Check the browser console. Ensure you are using a local web server.`);
+                }
+            }, 1500); // Wait 1.5 seconds. You can adjust this value if needed.
+
+        };
+
+        ketcherFrame.onerror = (err) => {
+            console.error("Ketcher iframe onerror event fired:", err);
+            ketcherStatusEl.textContent = "Failed to load Ketcher iframe. Check path & network.";
+            ketcherStatusEl.className = "status-error";
+            processButton.disabled = true;
+            displayError("ERROR: The Ketcher iframe itself failed to load. This often means the path to 'ketcher/index.html' is incorrect or the files are missing. Ensure the 'ketcher' folder is in the same directory as this HTML file.");
+        };
+        
+        processButton.addEventListener('click', handleProcessSMILES);
+        smilesInput.addEventListener('keypress', (event) => {
+            if (event.key === "Enter") {
+                if (!processButton.disabled) {
+                    handleProcessSMILES();
+                }
+            }
+        });
+
+        function setExampleSMILES(smiles) {
+            smilesInput.value = smiles;
+            if (!processButton.disabled) {
+                handleProcessSMILES();
+            }
+        }
+
+        function displayError(message) {
+            errorDisplay.textContent = message;
+            errorDisplay.style.display = 'block';
+        }
+
+        function clearError() {
+            errorDisplay.textContent = '';
+            errorDisplay.style.display = 'none';
+        }
+
+        async function handleProcessSMILES() {
+            clearError();
+            const smiles = smilesInput.value.trim();
+            if (!smiles) {
+                displayError("Please enter a SMILES string.");
+                return;
+            }
+
+            if (!ketcherInstance) {
+                displayError("Ketcher is not ready. Please wait or check status messages and console.");
+                return;
+            }
+
+            // Clear previous results
+            protonNmrTbody.innerHTML = '';
+            carbonNmrTbody.innerHTML = '';
+            formulaDisplay.textContent = '';
+
+            try {
+                console.log("Setting molecule in Ketcher:", smiles);
+                await ketcherInstance.setMolecule(smiles);
+                console.log("Getting Molfile from Ketcher...");
+                const molfile = await ketcherInstance.getMolfile('v2000');
+                console.log("Molfile received (first 100 chars):", molfile.substring(0,100));
+                
+                const moleculeData = parseMolfile(molfile);
+                
+                if (!moleculeData || moleculeData.atoms.length === 0) {
+                    displayError("Could not parse the SMILES string or Molfile. Please check SMILES validity or Molfile structure.");
+                    console.error("Parsed molecule data is empty or null. Molfile was:", molfile);
+                    return;
+                }
+
+                const molecularFormula = calculateMolecularFormula(moleculeData.atoms);
+                formulaDisplay.textContent = `Molecular Formula: ${molecularFormula}`;
+                
+                predictAndDisplayNMR(moleculeData);
+
+            } catch (error) {
+                console.error("Error processing SMILES:", error);
+                displayError(`Error: ${error.message || "Could not process SMILES string. Check format (e.g., CCO, CC(=O)C) and browser console for more details."}`);
+                // Clear tables on error too
+                protonNmrTbody.innerHTML = '';
+                carbonNmrTbody.innerHTML = '';
+                formulaDisplay.textContent = '';
+            }
+        }
+
+        function parseMolfile(molfileString) {
+            const lines = molfileString.split(/\r?\n/);
+            const atoms = [];
+            const bonds = [];
+
+            if (lines.length < 4) {
+                console.error("Molfile too short:", molfileString);
+                return null;
+            }
+
+            const countsLineText = lines[3];
+            if (!countsLineText) {
+                console.error("Molfile missing counts line (line 4). Molfile:", molfileString);
+                return null;
+            }
+            const countsLine = countsLineText.trim().split(/\s+/);
+            const numAtoms = parseInt(countsLine[0]);
+            const numBonds = parseInt(countsLine[1]);
+
+            if (isNaN(numAtoms) || isNaN(numBonds)) {
+                console.error("Invalid atom/bond counts in Molfile:", countsLineText);
+                return null;
+            }
+            
+            // Atom block: starts at line index 4, for numAtoms lines
+            for (let i = 0; i < numAtoms; i++) {
+                const atomLineIndex = 4 + i;
+                if (atomLineIndex >= lines.length) {
+                    console.error(`Molfile ended prematurely. Expected atom line ${atomLineIndex}, but only ${lines.length} lines.`);
+                    return null;
+                }
+                const atomLine = lines[atomLineIndex];
+                const parts = atomLine.trim().split(/\s+/);
+                if (parts.length < 4) {
+                     console.error(`Malformed atom line ${atomLineIndex}: ${atomLine}`);
+                     return null; // Skip malformed line or abort
+                }
+                atoms.push({
+                    id: i + 1, // 1-indexed as in Molfile
+                    symbol: parts[3],
+                    x: parseFloat(parts[0]),
+                    y: parseFloat(parts[1]),
+                    z: parseFloat(parts[2]),
+                    charge: parseInt(parts[5]) || 0, // M  CHG field
+                    hydrogens: 0, 
+                    neighbors: [] 
+                });
+            }
+
+            // Bond block: starts after atom block, for numBonds lines
+            for (let i = 0; i < numBonds; i++) {
+                const bondLineIndex = 4 + numAtoms + i;
+                 if (bondLineIndex >= lines.length) {
+                    console.error(`Molfile ended prematurely. Expected bond line ${bondLineIndex}, but only ${lines.length} lines.`);
+                    return null;
+                }
+                const bondLine = lines[bondLineIndex];
+                const parts = bondLine.trim().split(/\s+/);
+                 if (parts.length < 3) {
+                     console.error(`Malformed bond line ${bondLineIndex}: ${bondLine}`);
+                     return null; // Skip malformed line or abort
+                }
+                const atom1Id = parseInt(parts[0]);
+                const atom2Id = parseInt(parts[1]);
+                const bondType = parseInt(parts[2]);
+                bonds.push({ from: atom1Id, to: atom2Id, type: bondType });
+
+                const atom1 = atoms.find(a => a.id === atom1Id);
+                const atom2 = atoms.find(a => a.id === atom2Id);
+                if (atom1 && atom2) { // Ensure both atoms were found
+                    atom1.neighbors.push({ atomId: atom2Id, bondType: bondType, atomSymbol: atom2.symbol });
+                    atom2.neighbors.push({ atomId: atom1Id, bondType: bondType, atomSymbol: atom1.symbol });
+                } else {
+                    console.warn(`Could not find atoms for bond: ${atom1Id}-${atom2Id}`);
+                }
+            }
+            
+            atoms.forEach(atom => {
+                if (atom.symbol !== 'H') {
+                    let typicalValence = 0;
+                    switch (atom.symbol) {
+                        case 'C': typicalValence = 4; break;
+                        case 'N': typicalValence = 3; break; 
+                        case 'O': typicalValence = 2; break;
+                        case 'S': typicalValence = 2; break; 
+                        case 'P': typicalValence = 3; break; 
+                        case 'F': case 'Cl': case 'Br': case 'I': typicalValence = 1; break;
+                        default: typicalValence = 0; 
+                    }
+
+                    let currentValenceUsed = 0;
+                    atom.neighbors.forEach(n => currentValenceUsed += n.bondType);
+                    
+                    let numHydrogens;
+                    // Adjust typical valence based on charge for common elements
+                    if (atom.symbol === 'N') {
+                        typicalValence = atom.charge === 1 ? 4 : (atom.charge === -1 ? 2 : 3);
+                    } else if (atom.symbol === 'O') {
+                        typicalValence = atom.charge === 1 ? 3 : (atom.charge === -1 ? 1 : 2);
+                    } else if (atom.symbol === 'S') { // S can be 2, 4, 6; simplified for now
+                        typicalValence = atom.charge === 1 ? 3 : (atom.charge === -1 ? 1 : 2); 
+                    } else if (atom.symbol === 'C') { // Carbocations/anions
+                        if (atom.charge === 1 || atom.charge === -1) typicalValence = 3;
+                    }
+                    // Halogens generally don't change valence with charge in this context
+
+                    numHydrogens = typicalValence - currentValenceUsed;
+                    atom.hydrogens = Math.max(0, numHydrogens);
+                }
+            });
+
+            return { atoms, bonds };
+        }
+
+        function calculateMolecularFormula(atoms) {
+            const counts = {};
+            let totalHydrogens = 0;
+
+            atoms.forEach(atom => {
+                if (atom.symbol === 'H') { 
+                    totalHydrogens++;
+                } else {
+                    counts[atom.symbol] = (counts[atom.symbol] || 0) + 1;
+                    totalHydrogens += atom.hydrogens;
+                }
+            });
+            if (totalHydrogens > 0) counts['H'] = totalHydrogens;
+
+            let formula = "";
+            if (counts.C) formula += `C${counts.C > 1 ? counts.C : ''}`;
+            if (counts.H) formula += `H${counts.H > 1 ? counts.H : ''}`;
+            
+            Object.keys(counts).sort().forEach(symbol => {
+                if (symbol !== 'C' && symbol !== 'H') {
+                    formula += `${symbol}${counts[symbol] > 1 ? counts[symbol] : ''}`;
+                }
+            });
+            return formula;
+        }
+
+        function predictAndDisplayNMR(moleculeData) {
+            // (This function remains largely the same as before)
+            // Clear previous results first
+            protonNmrTbody.innerHTML = '';
+            carbonNmrTbody.innerHTML = '';
+
+            const { atoms, bonds } = moleculeData;
+
+            // --- 13C NMR ---
+            atoms.forEach(atom => {
+                if (atom.symbol === 'C') {
+                    const { shiftRange, environment } = predictCarbonShift(atom, atoms, bonds);
+                    const row = carbonNmrTbody.insertRow();
+                    row.insertCell().textContent = `C${atom.id}`;
+                    row.insertCell().textContent = environment;
+                    row.insertCell().textContent = shiftRange;
+                }
+            });
+
+            // --- 1H NMR ---
+            // Collect all H-bearing atoms first to potentially group equivalent ones later (not fully implemented here)
+            const hGroups = [];
+            atoms.forEach(atom => {
+                if (atom.hydrogens > 0) { // Protons on C, N, O, S etc.
+                    if (atom.symbol === 'C') {
+                        const { shiftRange, environment, multiplicity } = predictProtonShiftAndMultiplicity(atom, atoms, bonds);
+                        hGroups.push({
+                            label: `H on C${atom.id}`,
+                            idLabel: `C${atom.id}`,
+                            environment,
+                            shiftRange,
+                            multiplicity,
+                            integration: atom.hydrogens
+                        });
+                    } else if (['O', 'N', 'S'].includes(atom.symbol)) { 
+                        let shiftRange = "1 - 5 (broad, exchangeable)";
+                        let environment = `${atom.hydrogens}H on ${atom.symbol}${atom.id} (-${atom.symbol}H)`;
+                        let multiplicity = "s (broad)";
+
+                        if (atom.symbol === 'N') {
+                             // Check if Amide N-H
+                             const isAmide = atom.neighbors.some(n => {
+                                const neighborAtom = getAtomById(n.atomId, atoms);
+                                if (neighborAtom && neighborAtom.symbol === 'C' && n.bondType === 1) { // N bonded to a C
+                                    // Check if that C is a carbonyl carbon
+                                    return neighborAtom.neighbors.some(cn => cn.atomSymbol === 'O' && cn.bondType === 2);
+                                }
+                                return false;
+                            });
+                            if (isAmide) {
+                                shiftRange = "5.0 - 9.0 (Amide NH)";
+                                environment = `Amide H on N${atom.id}`;
+                            } else {
+                                environment = `Amine H on N${atom.id}`;
+                            }
+                        } else if (atom.symbol === 'O') {
+                            // Check if Carboxylic Acid O-H
+                            const isCarboxylicAcid = atom.neighbors.some(n => {
+                                const neighborAtom = getAtomById(n.atomId, atoms);
+                                // O is bonded to a C, and that C is a C=O
+                                return neighborAtom && neighborAtom.symbol === 'C' && n.bondType === 1 &&
+                                       neighborAtom.neighbors.some(cn => cn.atomSymbol === 'O' && cn.bondType === 2);
+                            });
+                            if (isCarboxylicAcid) {
+                                shiftRange = "10 - 13 (Carboxylic Acid OH, very broad)";
+                                environment = `Acid H on O${atom.id}`;
+                            } else {
+                                environment = `Alcohol/Phenol H on O${atom.id}`;
+                            }
+                        } else if (atom.symbol === 'S'){
+                            environment = `Thiol H on S${atom.id}`;
+                            shiftRange = "1 - 2.5 (Thiol SH)";
+                        }
+                        
+                        hGroups.push({
+                            label: `H on ${atom.symbol}${atom.id}`,
+                            idLabel: `${atom.symbol}${atom.id}`,
+                            environment,
+                            shiftRange,
+                            multiplicity,
+                            integration: atom.hydrogens
+                        });
+                    }
+                }
+            });
+
+            // Display H NMR (currently one row per group of H on a heavy atom)
+            // Future improvement: detect chemical equivalence
+            hGroups.forEach(group => {
+                 const row = protonNmrTbody.insertRow();
+                row.insertCell().textContent = group.label;
+                row.insertCell().textContent = group.environment;
+                row.insertCell().textContent = group.shiftRange;
+                row.insertCell().textContent = group.multiplicity;
+                row.insertCell().textContent = group.integration;
+            });
+        }
+        
+        function getAtomById(id, atoms) {
+            return atoms.find(a => a.id === id);
+        }
+
+        function getCarbonEnvironment(carbonAtom, allAtoms, allBonds) {
+            let environment = `C (${carbonAtom.hydrogens}H)`;
+            let isAromatic = false;
+            let isAlkene = false;
+            let isAlkyne = false;
+            let attachedToOxygen = 0; 
+            let attachedToNitrogen = 0;
+            let attachedToHalogen = 0;
+            let isCarbonylCarbon = false; 
+            let carbonylTypeDetail = "";
+
+            // Check bond types from neighbors
+            carbonAtom.neighbors.forEach(neighborInfo => {
+                const neighborAtom = getAtomById(neighborInfo.atomId, allAtoms);
+                if (!neighborAtom) return;
+
+                if (neighborInfo.bondType === 4) isAromatic = true; // Ketcher explicit aromatic
+                if (neighborAtom.symbol === 'C') {
+                    if (neighborInfo.bondType === 2) isAlkene = true;
+                    if (neighborInfo.bondType === 3) isAlkyne = true;
+                } else if (neighborAtom.symbol === 'O') {
+                    attachedToOxygen++;
+                    if (neighborInfo.bondType === 2) { // This C is double bonded to an O -> carbonyl
+                        isCarbonylCarbon = true;
+                    }
+                } else if (neighborAtom.symbol === 'N') {
+                    attachedToNitrogen++;
+                } else if (['F', 'Cl', 'Br', 'I'].includes(neighborAtom.symbol)) {
+                    attachedToHalogen++;
+                }
+            });
+            
+            // Refine environment string
+            if (isAromatic) environment = "Aromatic C";
+            else if (isCarbonylCarbon) {
+                carbonylTypeDetail = "Carbonyl C=O";
+                // Aldehyde: C(=O)H. Check if this carbon has any hydrogens
+                if (carbonAtom.hydrogens > 0) carbonylTypeDetail = "Aldehyde C=O";
+                else {
+                    // Ketone, Acid, Ester, Amide? Check other neighbors of C=O
+                    const nonOxygenNeighbors = carbonAtom.neighbors.filter(n => !(getAtomById(n.atomId, allAtoms).symbol === 'O' && n.bondType === 2));
+                    const neighborSymbols = nonOxygenNeighbors.map(n => getAtomById(n.atomId, allAtoms).symbol);
+
+                    if (neighborSymbols.every(s => s === 'C')) carbonylTypeDetail = "Ketone C=O";
+                    else if (neighborSymbols.some(s => s === 'O')) carbonylTypeDetail = "Acid/Ester/Anhydride C=O";
+                    else if (neighborSymbols.some(s => s === 'N')) carbonylTypeDetail = "Amide C=O";
+                }
+                environment = carbonylTypeDetail;
+            }
+            else if (isAlkyne) environment = `Alkyne C≡C (-CH${carbonAtom.hydrogens})`;
+            else if (isAlkene) environment = `Alkene C=C (-CH${carbonAtom.hydrogens})`;
+            else if (attachedToOxygen > 0) environment = `C-O (Alcohol/Ether, ${attachedToOxygen}O, -CH${carbonAtom.hydrogens})`;
+            else if (attachedToNitrogen > 0) environment = `C-N (Amine, ${attachedToNitrogen}N, -CH${carbonAtom.hydrogens})`;
+            else if (attachedToHalogen > 0) environment = `C-X (Halide, ${attachedToHalogen}X, -CH${carbonAtom.hydrogens})`;
+            else { // Alkyl
+                if (carbonAtom.hydrogens === 3) environment = "Alkyl CH3";
+                else if (carbonAtom.hydrogens === 2) environment = "Alkyl CH2";
+                else if (carbonAtom.hydrogens === 1) environment = "Alkyl CH";
+                else if (carbonAtom.hydrogens === 0) environment = "Alkyl Quaternary C";
+            }
+            
+            return { environment, isAromatic, isAlkene, isAlkyne, attachedToOxygen, isCarbonylCarbon, carbonylTypeDetail, attachedToNitrogen, attachedToHalogen };
+        }
+
+        function predictCarbonShift(carbonAtom, allAtoms, allBonds) {
+            const env = getCarbonEnvironment(carbonAtom, allAtoms, allBonds);
+            let shiftRange = "5 - 50 (Alkyl Default)";
+
+            if (env.isAromatic) shiftRange = "110 - 160";
+            else if (env.isCarbonylCarbon) {
+                if (env.carbonylTypeDetail.includes("Ketone") || env.carbonylTypeDetail.includes("Aldehyde")) shiftRange = "190 - 220";
+                else if (env.carbonylTypeDetail.includes("Acid/Ester") || env.carbonylTypeDetail.includes("Amide")) shiftRange = "160 - 185";
+            }
+            else if (env.isAlkyne) shiftRange = "65 - 90";
+            else if (env.isAlkene) shiftRange = "100 - 150";
+            else if (env.environment.includes("C-O")) shiftRange = "40 - 80"; // C-O (alcohol, ether)
+            else if (env.environment.includes("C-N")) shiftRange = "20 - 65"; // C-N
+            else if (env.environment.includes("C-X")) {
+                // Halogen effects vary: C-I ~0-40, C-Br ~25-65, C-Cl ~30-75, C-F ~70-90
+                shiftRange = "10 - 90 (C-X, varies)"; 
+            }
+            else { // Alkyl refinement
+                if (carbonAtom.hydrogens === 3) shiftRange = "5 - 30 (CH3)";
+                else if (carbonAtom.hydrogens === 2) shiftRange = "15 - 50 (CH2)"; // Broader for CH2
+                else if (carbonAtom.hydrogens === 1) shiftRange = "25 - 60 (CH)";  // Broader for CH
+                else shiftRange = "30 - 60 (Quat. C)";
+            }
+            return { shiftRange, environment: env.environment };
+        }
+
+        function predictProtonShiftAndMultiplicity(carbonAtom, allAtoms, allBonds) {
+            const carbonEnvInfo = getCarbonEnvironment(carbonAtom, allAtoms, allBonds);
+            let shiftRange = "0.5 - 2.0 (Alkyl Default)";
+            let specificEnv = `H on ${carbonEnvInfo.environment}`;
+
+            // Check if this carbon (where H is attached) is special
+            if (carbonEnvInfo.carbonylTypeDetail.includes("Aldehyde")) { // Is it the H of an aldehyde C-H?
+                shiftRange = "9.0 - 10.0";
+                specificEnv = "Aldehyde H";
+            } else if (carbonEnvInfo.isAromatic) {
+                shiftRange = "6.5 - 8.5";
+                specificEnv = "Aromatic H";
+            } else if (carbonEnvInfo.isAlkene) {
+                shiftRange = "4.5 - 6.5";
+                specificEnv = "Vinylic H (on C=C)";
+            } else if (carbonEnvInfo.isAlkyne && carbonAtom.hydrogens > 0) { // Terminal Alkyne H
+                shiftRange = "1.8 - 3.0";
+                specificEnv = "Alkynyl H (on C≡CH)";
+            } else if (carbonEnvInfo.environment.includes("C-O")) { // H on C attached to O (e.g. -CH2-O-)
+                shiftRange = "3.2 - 4.5";
+                specificEnv = `H on C adjacent to O (e.g. R-CH${carbonAtom.hydrogens}-O)`;
+            } else if (carbonEnvInfo.environment.includes("C-N")) { // H on C attached to N
+                shiftRange = "2.2 - 3.5";
+                specificEnv = `H on C adjacent to N (e.g. R-CH${carbonAtom.hydrogens}-N)`;
+            } else if (carbonEnvInfo.environment.includes("C-X")) { // H on C attached to Halogen
+                shiftRange = "2.5 - 4.5 (H-C-X, varies)";
+                specificEnv = `H on C adjacent to Halogen (e.g. R-CH${carbonAtom.hydrogens}-X)`;
+            } else {
+                // Not directly on a special C, check neighbors for alpha positions
+                let isAlphaToCarbonyl = false;
+                let isBenzylic = false;
+                let isAllylic = false;
+
+                carbonAtom.neighbors.forEach(neighborInfo => {
+                    const adjHeavyAtom = getAtomById(neighborInfo.atomId, allAtoms);
+                    if (adjHeavyAtom && adjHeavyAtom.symbol === 'C') { // Only consider C neighbors for these alpha effects
+                        const adjCarbonEnv = getCarbonEnvironment(adjHeavyAtom, allAtoms, allBonds);
+                        if (adjCarbonEnv.isCarbonylCarbon) isAlphaToCarbonyl = true;
+                        if (adjCarbonEnv.isAromatic) isBenzylic = true;
+                        if (adjCarbonEnv.isAlkene) isAllylic = true;
+                    }
+                });
+
+                if (isAlphaToCarbonyl) {
+                    shiftRange = "2.0 - 2.7 (α to C=O)";
+                    specificEnv = `H α to Carbonyl (C=O) on C${carbonAtom.id}`;
+                } else if (isBenzylic) {
+                    shiftRange = "2.2 - 3.0 (Benzylic)";
+                    specificEnv = `Benzylic H (α to Aromatic) on C${carbonAtom.id}`;
+                } else if (isAllylic) {
+                    shiftRange = "1.6 - 2.6 (Allylic)";
+                    specificEnv = `Allylic H (α to C=C) on C${carbonAtom.id}`;
+                } else { // Generic Alkyl
+                    if (carbonAtom.hydrogens === 3) { shiftRange = "0.7 - 1.5 (CH3)"; specificEnv = `Methyl H on C${carbonAtom.id}`; }
+                    else if (carbonAtom.hydrogens === 2) { shiftRange = "1.2 - 1.8 (CH2)"; specificEnv = `Methylene H on C${carbonAtom.id}`; }
+                    else if (carbonAtom.hydrogens === 1) { shiftRange = "1.4 - 2.0 (CH)"; specificEnv = `Methine H on C${carbonAtom.id}`; }
+                }
+            }
+
+            // Multiplicity (n+1 rule, simplified for adjacent carbons only)
+            let neighboringProtons = 0;
+            carbonAtom.neighbors.forEach(neighborInfo => {
+                const adjacentAtom = getAtomById(neighborInfo.atomId, allAtoms);
+                if (adjacentAtom && adjacentAtom.symbol === 'C') { 
+                    neighboringProtons += adjacentAtom.hydrogens;
+                }
+            });
+            
+            let multiplicity = "m"; // Default multiplet
+            const n = neighboringProtons;
+            if (n === 0) multiplicity = "s (singlet)";
+            else if (n === 1) multiplicity = "d (doublet)";
+            else if (n === 2) multiplicity = "t (triplet)";
+            else if (n === 3) multiplicity = "q (quartet)";
+            else if (n === 4) multiplicity = "quint (quintet)";
+            else if (n === 5) multiplicity = "sext (sextet)";
+            else if (n === 6) multiplicity = "sept (septet)";
+            // For > 6, usually complex or broad.
+
+            return { shiftRange, environment: specificEnv, multiplicity };
+        }
+    </script>
+</body>
+</html>
